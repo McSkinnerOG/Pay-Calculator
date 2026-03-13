@@ -155,8 +155,13 @@ input,select{
 </div>
 
 <div>
-<label>Overtime Rate ($)</label>
+<label>Overtime Rate ($) — first 3 hrs</label>
 <input id="overtimeRate" type="number" value="46.46">
+</div>
+
+<div>
+<label>Double-Time Rate ($) — after 3 hrs</label>
+<input id="doubleRate" type="number" value="66.38">
 </div>
 
 </div>
@@ -232,9 +237,22 @@ ${minuteOptions(30)}
 
 </div>
 
-<div class="field overtime-toggle">
-<input type="checkbox" id="overtime${i}">
-<label>Overtime</label>
+<div class="field">
+<label>Overtime Hours</label>
+<div class="break-row">
+<select id="overtimeH${i}">
+<option value="0">0h</option>
+<option value="1">1h</option>
+<option value="2">2h</option>
+<option value="3">3h</option>
+<option value="4">4h</option>
+<option value="5">5h</option>
+<option value="6">6h</option>
+</select>
+<select id="overtimeM${i}">
+${minuteOptions(0)}
+</select>
+</div>
 </div>
 
 <div class="field">
@@ -266,8 +284,11 @@ document.getElementById("breakH"+(i-1)).value;
 document.getElementById("breakM"+i).value =
 document.getElementById("breakM"+(i-1)).value;
 
-document.getElementById("overtime"+i).checked =
-document.getElementById("overtime"+(i-1)).checked;
+document.getElementById("overtimeH"+i).value =
+document.getElementById("overtimeH"+(i-1)).value;
+
+document.getElementById("overtimeM"+i).value =
+document.getElementById("overtimeM"+(i-1)).value;
 
 calculate();
 
@@ -278,6 +299,7 @@ function calculate(){
 let normalRate = parseFloat(document.getElementById("normalRate").value) || 0;
 let weekendRate = parseFloat(document.getElementById("weekendRate").value) || 0;
 let overtimeRate = parseFloat(document.getElementById("overtimeRate").value) || 0;
+let doubleRate = parseFloat(document.getElementById("doubleRate").value) || 0;
 
 let totalHours = 0;
 let totalPay = 0;
@@ -288,39 +310,49 @@ let start = document.getElementById("start"+i).value;
 let end = document.getElementById("end"+i).value;
 
 if(!start || !end){
-
 document.getElementById("hours"+i).innerText = "0";
 continue;
-
 }
 
 let startTime = new Date("1970-01-01T"+start);
 let endTime = new Date("1970-01-01T"+end);
 
 let hours = (endTime - startTime)/1000/60/60;
-
 if(hours < 0) hours += 24;
 
 let breakH = parseInt(document.getElementById("breakH"+i).value);
 let breakM = parseInt(document.getElementById("breakM"+i).value);
-
 let breakTime = breakH + (breakM/60);
-
 hours -= breakTime;
-
 if(hours < 0) hours = 0;
 
 document.getElementById("hours"+i).innerText = hours.toFixed(2);
 
 let isWeekend = (i === 5 || i === 6);
-let overtime = document.getElementById("overtime"+i).checked;
+let baseRate = isWeekend ? weekendRate : normalRate;
 
-let rate = normalRate;
+let overtimeH = parseInt(document.getElementById("overtimeH"+i).value) || 0;
+let overtimeM = parseInt(document.getElementById("overtimeM"+i).value) || 0;
+let overtimeTotal = overtimeH + (overtimeM/60);
 
-if(isWeekend) rate = weekendRate;
-if(overtime) rate = overtimeRate;
+let pay = 0;
 
-let pay = hours * rate;
+if(overtimeTotal === 0){
+  // No overtime — all hours at base rate
+  pay = hours * baseRate;
+} else {
+  // Regular hours = total hours minus overtime
+  let regularHours = Math.max(hours - overtimeTotal, 0);
+  let actualOvertime = hours - regularHours;
+
+  // First 3 overtime hours at overtime rate, remainder at double rate
+  let overtimeAt1x = Math.min(actualOvertime, 3);
+  let overtimeAt2x = Math.max(actualOvertime - 3, 0);
+
+  pay = (regularHours * baseRate)
+      + (overtimeAt1x * overtimeRate)
+      + (overtimeAt2x * doubleRate);
+}
 
 totalHours += hours;
 totalPay += pay;
@@ -343,7 +375,8 @@ document.getElementById("start"+i).addEventListener("input",calculate);
 document.getElementById("end"+i).addEventListener("input",calculate);
 document.getElementById("breakH"+i).addEventListener("change",calculate);
 document.getElementById("breakM"+i).addEventListener("change",calculate);
-document.getElementById("overtime"+i).addEventListener("change",calculate);
+document.getElementById("overtimeH"+i).addEventListener("change",calculate);
+document.getElementById("overtimeM"+i).addEventListener("change",calculate);
 
 }
 
