@@ -164,6 +164,8 @@ input,select{
 
 <div id="days"></div>
 
+<button class="copy-btn" onclick="calculate()" style="margin-bottom:15px;font-size:17px;padding:14px;">Calculate Pay</button>
+
 <div class="results">
 <div id="totalHours">Total Hours: 0</div>
 <div id="totalPay">Total Pay: $0</div>
@@ -198,7 +200,7 @@ let card = `
 
 <div class="day-header">${day}</div>
 
-<button class="copy-btn" onclick="copyLast(${i})">Copy Last Shift</button>
+${i === 0 ? '' : `<button class="copy-btn" onclick="copyLast(${i})">Copy Last Shift</button>`}
 
 <div class="field">
 <label>Start Time</label>
