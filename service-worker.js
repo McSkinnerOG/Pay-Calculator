@@ -1,21 +1,10 @@
-const CACHE_NAME = "pay-calculator-v2";
+const CACHE = "pay-calculator-v3";
 
-const urlsToCache = [
-  "index.html",
-  "manifest.json"
+const FILES = [
+"/",
+"/index.html",
+"/manifest.json"
 ];
-
-self.addEventListener("install", event => {
-
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-  );
-
-  self.skipWaiting();
-
-});
-
 self.addEventListener("activate", event => {
 
   event.waitUntil(
@@ -30,12 +19,20 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 
 });
+self.addEventListener("install", e => {
 
-self.addEventListener("fetch", event => {
+e.waitUntil(
+caches.open(CACHE)
+.then(cache => cache.addAll(FILES))
+);
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
+});
+
+self.addEventListener("fetch", e => {
+
+e.respondWith(
+caches.match(e.request)
+.then(res => res || fetch(e.request))
+);
 
 });
