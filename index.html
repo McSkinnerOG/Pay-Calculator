@@ -180,47 +180,48 @@ input,select{
 </div>
 
 <script>
-
 const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const daysContainer = document.getElementById("days");
+const el = id => document.getElementById(id);
 
-function minuteOptions(selected){
+const STORAGE_KEY = "weeklyPayData";
 
-let options="";
+/* ---------- UTIL ---------- */
 
-for(let i=0;i<=55;i+=5){
+const minuteOptions = (selected=0)=>{
+    let html="";
+    for(let i=0;i<=55;i+=5){
+        html+=`<option value="${i}" ${i===selected?"selected":""}>${i}m</option>`;
+    }
+    return html;
+};
 
-options+=`<option value="${i}" ${i===selected?"selected":""}>${i}m</option>`;
+const getNum = id => parseFloat(el(id).value) || 0;
 
-}
-
-return options;
-
-}
+/* ---------- BUILD UI ---------- */
 
 days.forEach((day,i)=>{
 
-let card = `
+daysContainer.innerHTML+=`
 
 <div class="day-card">
 
 <div class="day-header">${day}</div>
 
-${i === 0 ? '' : `<button class="copy-btn" onclick="copyLast(${i})">Copy Last Shift</button>`}
+${i ? `<button class="copy-btn" onclick="copyLast(${i})">Copy Last Shift</button>` : ""}
 
 <div class="field">
-<label>Start Time</label>
+<label>Start</label>
 <input type="time" id="start${i}">
 </div>
 
 <div class="field">
-<label>Finish Time</label>
+<label>Finish</label>
 <input type="time" id="end${i}">
 </div>
 
 <div class="field">
 <label>Break</label>
-
 <div class="break-row">
 
 <select id="breakH${i}">
@@ -234,24 +235,20 @@ ${minuteOptions(30)}
 </select>
 
 </div>
-
 </div>
 
 <div class="field">
-<label>Overtime Hours</label>
+<label>Overtime</label>
 <div class="break-row">
+
 <select id="overtimeH${i}">
-<option value="0">0h</option>
-<option value="1">1h</option>
-<option value="2">2h</option>
-<option value="3">3h</option>
-<option value="4">4h</option>
-<option value="5">5h</option>
-<option value="6">6h</option>
+${[0,1,2,3,4,5,6].map(h=>`<option>${h}</option>`).join("")}
 </select>
+
 <select id="overtimeM${i}">
-${minuteOptions(0)}
+${minuteOptions()}
 </select>
+
 </div>
 </div>
 
@@ -261,135 +258,146 @@ ${minuteOptions(0)}
 </div>
 
 </div>
-
 `;
-
-daysContainer.innerHTML += card;
-
 });
+
+/* ---------- STORAGE ---------- */
+
+function saveData(){
+
+const data={};
+
+for(let i=0;i<7;i++){
+
+data[i]={
+start:el("start"+i).value,
+end:el("end"+i).value,
+breakH:el("breakH"+i).value,
+breakM:el("breakM"+i).value,
+overtimeH:el("overtimeH"+i).value,
+overtimeM:el("overtimeM"+i).value
+};
+
+}
+
+localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+
+}
+
+function loadData(){
+
+const data=JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+for(let i=0;i<7;i++){
+
+if(!data[i]) continue;
+
+Object.keys(data[i]).forEach(field=>{
+el(field+i).value=data[i][field];
+});
+
+}
+
+}
+
+/* ---------- COPY SHIFT ---------- */
 
 function copyLast(i){
 
-if(i === 0) return;
+if(!i) return;
 
-document.getElementById("start"+i).value =
-document.getElementById("start"+(i-1)).value;
+["start","end","breakH","breakM","overtimeH","overtimeM"].forEach(f=>{
+el(f+i).value=el(f+(i-1)).value;
+});
 
-document.getElementById("end"+i).value =
-document.getElementById("end"+(i-1)).value;
-
-document.getElementById("breakH"+i).value =
-document.getElementById("breakH"+(i-1)).value;
-
-document.getElementById("breakM"+i).value =
-document.getElementById("breakM"+(i-1)).value;
-
-document.getElementById("overtimeH"+i).value =
-document.getElementById("overtimeH"+(i-1)).value;
-
-document.getElementById("overtimeM"+i).value =
-document.getElementById("overtimeM"+(i-1)).value;
-
+saveData();
 calculate();
 
 }
 
+/* ---------- CALCULATE ---------- */
+
 function calculate(){
 
-let normalRate = parseFloat(document.getElementById("normalRate").value) || 0;
-let weekendRate = parseFloat(document.getElementById("weekendRate").value) || 0;
-let overtimeRate = parseFloat(document.getElementById("overtimeRate").value) || 0;
-let doubleRate = parseFloat(document.getElementById("doubleRate").value) || 0;
+const normalRate=getNum("normalRate");
+const weekendRate=getNum("weekendRate");
+const overtimeRate=getNum("overtimeRate");
+const doubleRate=getNum("doubleRate");
 
-let totalHours = 0;
-let totalPay = 0;
+let totalHours=0;
+let totalPay=0;
 
 for(let i=0;i<7;i++){
 
-let start = document.getElementById("start"+i).value;
-let end = document.getElementById("end"+i).value;
+let start=el("start"+i).value;
+let end=el("end"+i).value;
 
-if(!start || !end){
-document.getElementById("hours"+i).innerText = "0";
+if(!start||!end){
+el("hours"+i).innerText="0";
 continue;
 }
 
-let startTime = new Date("1970-01-01T"+start);
-let endTime = new Date("1970-01-01T"+end);
+let startT=new Date("1970-01-01T"+start);
+let endT=new Date("1970-01-01T"+end);
 
-let hours = (endTime - startTime)/1000/60/60;
-if(hours < 0) hours += 24;
+let hours=(endT-startT)/3600000;
+if(hours<0) hours+=24;
 
-let breakH = parseInt(document.getElementById("breakH"+i).value);
-let breakM = parseInt(document.getElementById("breakM"+i).value);
-let breakTime = breakH + (breakM/60);
-hours -= breakTime;
-if(hours < 0) hours = 0;
+let breakTime=getNum("breakH"+i)+(getNum("breakM"+i)/60);
+hours=Math.max(hours-breakTime,0);
 
-document.getElementById("hours"+i).innerText = hours.toFixed(2);
+el("hours"+i).innerText=hours.toFixed(2);
 
-let isWeekend = (i === 5 || i === 6);
-let baseRate = isWeekend ? weekendRate : normalRate;
+let overtime=getNum("overtimeH"+i)+(getNum("overtimeM"+i)/60);
 
-let overtimeH = parseInt(document.getElementById("overtimeH"+i).value) || 0;
-let overtimeM = parseInt(document.getElementById("overtimeM"+i).value) || 0;
-let overtimeTotal = overtimeH + (overtimeM/60);
+let baseRate=(i>=5)?weekendRate:normalRate;
 
-let pay = 0;
+let regular=Math.max(hours-overtime,0);
+let ot=hours-regular;
 
-if(overtimeTotal === 0){
-  // No overtime — all hours at base rate
-  pay = hours * baseRate;
-} else {
-  // Regular hours = total hours minus overtime
-  let regularHours = Math.max(hours - overtimeTotal, 0);
-  let actualOvertime = hours - regularHours;
+let ot1=Math.min(ot,3);
+let ot2=Math.max(ot-3,0);
 
-  // First 3 overtime hours at overtime rate, remainder at double rate
-  let overtimeAt1x = Math.min(actualOvertime, 3);
-  let overtimeAt2x = Math.max(actualOvertime - 3, 0);
+let pay=(regular*baseRate)+(ot1*overtimeRate)+(ot2*doubleRate);
 
-  pay = (regularHours * baseRate)
-      + (overtimeAt1x * overtimeRate)
-      + (overtimeAt2x * doubleRate);
-}
-
-totalHours += hours;
-totalPay += pay;
+totalHours+=hours;
+totalPay+=pay;
 
 }
 
-document.getElementById("totalHours").innerText =
-"Total Hours: " + totalHours.toFixed(2);
+el("totalHours").innerText="Total Hours: "+totalHours.toFixed(2);
+el("totalPay").innerText="Total Pay: $"+totalPay.toFixed(2);
 
-document.getElementById("totalPay").innerText =
-"Total Pay: $" + totalPay.toFixed(2);
+saveData();
 
 }
 
-function setupAutoCalculate(){
+/* ---------- AUTO EVENTS ---------- */
+
+function setupEvents(){
 
 for(let i=0;i<7;i++){
 
-document.getElementById("start"+i).addEventListener("input",calculate);
-document.getElementById("end"+i).addEventListener("input",calculate);
-document.getElementById("breakH"+i).addEventListener("change",calculate);
-document.getElementById("breakM"+i).addEventListener("change",calculate);
-document.getElementById("overtimeH"+i).addEventListener("change",calculate);
-document.getElementById("overtimeM"+i).addEventListener("change",calculate);
+["start","end"].forEach(f=>{
+el(f+i).addEventListener("input",calculate);
+});
+
+["breakH","breakM","overtimeH","overtimeM"].forEach(f=>{
+el(f+i).addEventListener("change",calculate);
+});
 
 }
 
 }
 
-setupAutoCalculate();
+setupEvents();
+loadData();
+calculate();
 
-/* PWA SERVICE WORKER */
+/* ---------- SERVICE WORKER ---------- */
 
 if("serviceWorker" in navigator){
-
 navigator.serviceWorker.register("service-worker.js");
-
 }
 
 </script>
